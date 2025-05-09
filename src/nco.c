@@ -21,6 +21,7 @@ void nco_init(void)
     {
         sin_t[i] = sinf(NCO_PHASE_INC * i);
         cos_t[i] = cosf(NCO_PHASE_INC * i);
+        printf("sin_t[%d] = %f, cos_t[%d] = %f\n", i, sin_t[i], i, cos_t[i]);
     }
     nco_phase = 0;
 }
@@ -43,7 +44,7 @@ void nco_mix(float *input, float *inphase, float *quadrature, int chunk_size)
     // if we have more than 200 samples to process, we can process them in chunks of 200
     // and we can use the current phase to start the next chunk
     // We start consuming the current NCO chunk, so the next chunk will start at 0
-    while (chunk_size >= remaining)
+    while (chunk_size > remaining)
     {
         // arm_mult_f32(&input[start], &sin_t[nco_phase], inphase, remaining);
         // arm_mult_f32(&input[start], &cos_t[nco_phase], quadrature, remaining);
@@ -84,12 +85,13 @@ void nco_mix(float *input, float *inphase, float *quadrature, int chunk_size)
 }
 
 #define CHUNK 200
+
+float input[8192];
+float inphase[8192];
+float quadrature[8192];
 int main(int argc, char *argv[])
 {
     nco_init();
-    float input[8192];
-    float inphase[8192];
-    float quadrature[8192];
 
     // fill the input buffer with some data
     for (int i = 0; i < 8192; i++)
@@ -99,8 +101,9 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < 8192; i += CHUNK)
     {
-        // process the input buffer in chunks of 256 samples
-        nco_mix(&input[i], &inphase[i], &quadrature[i], CHUNK);
+        int current_chunk_size = (i + CHUNK > 8192) ? (8192 - i) : CHUNK;
+
+        nco_mix(&input[i], &inphase[i], &quadrature[i], current_chunk_size);
     }
 
     // check if the inphase correspond to a series of sine waves
@@ -108,15 +111,18 @@ int main(int argc, char *argv[])
     {
         for (int j = 0; j < NCO_CHUNK_SIZE; j++)
         {
-            if (fabsf(inphase[i * NCO_CHUNK_SIZE + j] - sin_t[j]) > 0.01)
+            if (i + j >= 8192)
+                break;
+
+            if (fabsf(inphase[i + j] - sin_t[j]) > 0.01)
             {
-                printf("Error in inphase at %d: %f != %f \n", i * NCO_CHUNK_SIZE + j, inphase[i * NCO_CHUNK_SIZE + j], sin_t[j]);
+                printf("Error in inphase at %d: %f != %f \n", i + j, inphase[i + j], sin_t[j]);
                 return -1;
             }
 
-            if (fabsf(quadrature[i * NCO_CHUNK_SIZE + j] - cos_t[j]) > 0.01)
+            if (fabsf(quadrature[i + j] - cos_t[j]) > 0.01)
             {
-                printf("Error in quadrature at %d: %f != %f \n", i*NCO_CHUNK_SIZE+j, quadrature[i*NCO_CHUNK_SIZE+j], cos_t[j]);
+                printf("Error in quadrature at %d: %f != %f \n", i + j, quadrature[i + j], cos_t[j]);
                 return -1;
             }
         }
