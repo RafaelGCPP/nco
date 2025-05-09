@@ -25,13 +25,20 @@ void nco_init(void)
     nco_phase = 0;
 }
 
+void float_multiply(float *input1, float *input2, float *output, int size)
+{
+    for (int i = 0; i < size; i++)
+    {
+        output[i] = input1[i] * input2[i];
+    }
+}
+
 void nco_mix(float *input, float *inphase, float *quadrature, int chunk_size)
 {
     int start = 0;
     int remaining = NCO_CHUNK_SIZE - nco_phase;
 
-    printf ("Received chunk: %d (remains %d phase samples)\n", chunk_size, remaining);
-
+    printf("Received chunk: %d (remains %d phase samples)\n", chunk_size, remaining);
 
     // if we have more than 200 samples to process, we can process them in chunks of 200
     // and we can use the current phase to start the next chunk
@@ -41,7 +48,7 @@ void nco_mix(float *input, float *inphase, float *quadrature, int chunk_size)
         // arm_mult_f32(&input[start], &sin_t[nco_phase], inphase, remaining);
         // arm_mult_f32(&input[start], &cos_t[nco_phase], quadrature, remaining);
 
-        printf("-- 1: Processing %d samples from %d to %d\n", remaining, start, start + remaining-1);
+        printf("-- 1: Processing %d samples from %d to %d\n", remaining, start, start + remaining - 1);
         printf("-- 1: starting phase: %d\n", nco_phase);
 
         float_multiply(&input[start], &sin_t[nco_phase], inphase, remaining);
@@ -59,35 +66,25 @@ void nco_mix(float *input, float *inphase, float *quadrature, int chunk_size)
     // if we still have data to process, we can process it and advance the phase
     if (chunk_size > 0)
     {
-        printf("-- 2: Processing %d samples from %d to %d\n", chunk_size, start, start + chunk_size-1);
+        printf("-- 2: Processing %d samples from %d to %d\n", chunk_size, start, start + chunk_size - 1);
         printf("-- 2: starting phase: %d\n", nco_phase);
 
         float_multiply(&input[start], &sin_t[nco_phase], inphase, chunk_size);
         float_multiply(&input[start], &cos_t[nco_phase], quadrature, chunk_size);
-        
-        nco_phase += chunk_size;
-        printf("-- 2: ending phase: %d\n", nco_phase-1);
 
+        nco_phase += chunk_size;
+        printf("-- 2: ending phase: %d\n", nco_phase - 1);
     }
     // we should never overrun the phase, but just in case we do, we reset it to 0
     if (nco_phase >= NCO_CHUNK_SIZE)
     {
         nco_phase = 0;
         printf("-- 3: reset phase\n");
-
     }
 }
 
-void float_multiply(float *input1, float *input2, float *output, int size)
-{
-    for (int i = 0; i < size; i++)
-    {
-        output[i] = input1[i] * input2[i];
-    }
-}
-
-#define CHUNK 199
-void main() 
+#define CHUNK 200
+int main(int argc, char *argv[])
 {
     nco_init();
     float input[8192];
@@ -97,12 +94,32 @@ void main()
     // fill the input buffer with some data
     for (int i = 0; i < 8192; i++)
     {
-        input[i] = (float)i;
+        input[i] = (float)1.0;
     }
 
-    for (int i=0; i < 8192; i += CHUNK)
+    for (int i = 0; i < 8192; i += CHUNK)
     {
         // process the input buffer in chunks of 256 samples
         nco_mix(&input[i], &inphase[i], &quadrature[i], CHUNK);
     }
+
+    // check if the inphase correspond to a series of sine waves
+    for (int i = 0; i < 8192; i += NCO_CHUNK_SIZE)
+    {
+        for (int j = 0; j < NCO_CHUNK_SIZE; j++)
+        {
+            if (fabsf(inphase[i * NCO_CHUNK_SIZE + j] - sin_t[j]) > 0.01)
+            {
+                printf("Error in inphase at %d: %f != %f \n", i * NCO_CHUNK_SIZE + j, inphase[i * NCO_CHUNK_SIZE + j], sin_t[j]);
+                return -1;
+            }
+
+            if (fabsf(quadrature[i * NCO_CHUNK_SIZE + j] - cos_t[j]) > 0.01)
+            {
+                printf("Error in quadrature at %d: %f != %f \n", i*NCO_CHUNK_SIZE+j, quadrature[i*NCO_CHUNK_SIZE+j], cos_t[j]);
+                return -1;
+            }
+        }
+    }
+    return 0;
 }

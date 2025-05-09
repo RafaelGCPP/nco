@@ -3,6 +3,8 @@
 # Compiler and flags
 CC = gcc
 CFLAGS = -Wall -Wextra -O2
+# Link the math library
+LDFLAGS = -lm
 
 # Directories
 SRC_DIR = src
@@ -19,7 +21,7 @@ all: $(BUILD_DIR)/$(TARGET)
 
 $(BUILD_DIR)/$(TARGET): $(OBJ_FILES)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(BUILD_DIR)
@@ -34,3 +36,4 @@ clean:
 	@rm -rf $(BUILD_DIR)
 
 .PHONY: all test clean
+
