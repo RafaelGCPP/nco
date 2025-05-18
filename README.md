@@ -23,4 +23,4 @@ This repository contains a quick prototype and unit test for a Numerically Contr
 
 This project is provided as-is for prototyping and testing purposes.
 
-"With great powers come great responsibility." (Parker, B., Aug 1963)
+_"With great powers come great responsibility." (Parker, B., Aug 1963)_
